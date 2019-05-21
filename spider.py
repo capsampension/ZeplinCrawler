@@ -7,6 +7,7 @@ from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
 import os
 import json
+import warnings
 
 class Crawler(object):
     def __init__(self,
@@ -164,20 +165,39 @@ class Crawler(object):
         self.driver.implicitly_wait(self.DELAY * 3)
         project_overview = self.driver.find_element_by_class_name("projectOverview")
         sections = project_overview.find_element_by_id("sections")
-        screens = sections.find_elements_by_class_name("screen")
-        print('Found %d screens' % len(screens))
-        relative_urls = []
-        for i, screen in enumerate(screens):
-            url = screen.get_attribute('data-id')
-            relative_urls.append(url)
-            if (i+1) % 50 == 0:
-                print('Completed %1.2f%%' % (((i+1)/len(screens)) * 100))
-        print('Completed 100%%')
-        path = 'https://app.zeplin.io/project/5c3da066182f8e339c8d00a9/screen/'
-        relative_urls = [path + u for u in relative_urls]
-        with open(os.path.join(self.DATA_DIRECTORY, 'out.txt'), 'w', encoding='utf-8') as writer:
-            for u in relative_urls:
-                writer.write(u+'\n')
+        # We need to group name
+        groups = sections.find_elements_by_xpath('//div[starts-with(@class, "section")]')
+        print('Found %d groups' % len(groups))
+        r = []
+        for i, group in enumerate(groups):
+            if group.get_attribute('data-index') is not None:
+                print(i, group.get_attribute('data-index'), group.get_attribute('class'), group.get_attribute('data-id'))
+                group_name_elem = group.find_element_by_class_name("sectionNameForm")
+                # The find_elements_by_class_name (notice plural) is required as Selenium wouldnt find the text otherwise
+                name = group_name_elem.find_elements_by_class_name('mirror')
+                # textContent was also needed
+                assert len(name) == 0, warnings.warn("Found more than one 'mirror' tag")
+                print('Group: %s' % name[0].get_attribute('textContent'))
+                # Get the screens
+                screens = group.find_elements_by_class_name("screen")
+                print('\tNumber of screens: %d' % len(screens))
+                #for screen in screens:
+                    #print('\t\t'+screen.get_attribute("data-id"))
+        #print('After filtering: %d groups' % len(r))
+        #screens = sections.find_elements_by_class_name("screen")
+        #print('Found %d screens' % len(screens))
+        #relative_urls = []
+        #for i, screen in enumerate(screens):
+        #    url = screen.get_attribute('data-id')
+        #    relative_urls.append(url)
+        #    if (i+1) % 50 == 0:
+        #        print('Completed %1.2f%%' % (((i+1)/len(screens)) * 100))
+        #print('Completed 100%%')
+        #path = 'https://app.zeplin.io/project/5c3da066182f8e339c8d00a9/screen/'
+        #relative_urls = [path + u for u in relative_urls]
+        #with open(os.path.join(self.DATA_DIRECTORY, 'out.txt'), 'w', encoding='utf-8') as writer:
+        #    for u in relative_urls:
+        #        writer.write(u+'\n')
 
     def projectoverview(self):
         try:
@@ -242,9 +262,9 @@ if __name__ == "__main__":
     zeplin_crawler = Crawler(config_file="/home/casper/github/ZeplinCrawler/config.cfg")
     zeplin_crawler.login()
 
-    #zeplin_crawler.projectoverview()
-    #zeplin_crawler.get_screen_list()
-    zeplin_crawler.download_screen_history()
+    zeplin_crawler.projectoverview()
+    zeplin_crawler.get_screen_list()
+    #zeplin_crawler.download_screen_history()
 
 
 
