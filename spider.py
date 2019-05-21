@@ -89,6 +89,38 @@ class Crawler(object):
             print('All screenContent should now be visible')
             self.step(val=val + 1)
 
+    def step_new(self, screen_name):
+        screencontent = self.driver.find_element_by_xpath('//div[@class="screenContent"]')
+        # Now we must open the version sidebar
+        screenviewcontainer = screencontent.find_element_by_class_name("screenViewContainer")
+        screenview_widgets = screenviewcontainer.find_element_by_class_name("widgets")
+        toggle_version_button = screenview_widgets.find_element_by_xpath('//button[contains(@class, "versionsToggleWidget")]')
+        toggle_version_button.send_keys(Keys.RETURN)
+
+        # Wait a "fixed" amount
+        try:
+            WebDriverWait(self.driver, self.DELAY).until(
+                EC.presence_of_element_located((By.CLASS_NAME, 'versionHeader')))
+            # Should also get the name of the screen
+        except TimeoutException:
+            raise TimeoutException('Loading page took too much time')
+
+        versions_sidebar = screencontent.find_element_by_class_name("versionsSidebar")
+        versions = versions_sidebar.find_element_by_class_name("versions")
+        version_elements = versions.find_elements_by_class_name("versionHeader")
+
+        self.driver.implicitly_wait(self.DELAY)
+        version_list = []
+        for elem in version_elements:
+            version_date = elem.find_element_by_class_name('versionHeaderText').text
+            version_list.append(version_date)
+            print('Found version_date %s' % version_date)
+
+        # Flush results to disk
+        with open(os.path.join(self.DATA_DIRECTORY, screen_name+".json"), 'w', encoding='utf-8') as writer:
+            writer.write(json.dumps(version_list))
+
+
     def get_first_screen(self):
         try:
             WebDriverWait(self.driver, self.DELAY).until(EC.presence_of_element_located((By.XPATH, '//div[@data-index="0"]')))
@@ -138,11 +170,14 @@ class Crawler(object):
         for i, screen in enumerate(screens):
             url = screen.get_attribute('data-id')
             relative_urls.append(url)
-            if (i+1) % 100 == 0:
+            if (i+1) % 50 == 0:
                 print('Completed %1.2f%%' % (((i+1)/len(screens)) * 100))
         print('Completed 100%%')
         path = 'https://app.zeplin.io/project/5c3da066182f8e339c8d00a9/screen/'
         relative_urls = [path + u for u in relative_urls]
+        with open(os.path.join(self.DATA_DIRECTORY, 'out.txt'), 'w', encoding='utf-8') as writer:
+            for u in relative_urls:
+                writer.write(u+'\n')
 
     def projectoverview(self):
         try:
@@ -160,12 +195,12 @@ class Crawler(object):
         print('Logging in to Zeplin...')
         self.driver = webdriver.Chrome(self.CHROME_DRIVER_LOCATION)
         self.driver.get(self.ZEPLIN_HTTP_ADDRESS)
-
         try:
             WebDriverWait(self.driver, self.DELAY).until(EC.presence_of_element_located((By.ID, 'loginForm')))
             print("Loaded is ready!")
         except TimeoutException:
             raise TimeoutException('Loading Zeplin main page took too much time')
+
 
         loginform = self.driver.find_element_by_id('loginForm')
         username_field = loginform.find_element_by_id('handle')
@@ -176,12 +211,40 @@ class Crawler(object):
         password_field.send_keys(self.ZEPLIN_PASSWORD)
         password_field.send_keys(Keys.RETURN)
 
+        try:
+            WebDriverWait(self.driver, self.DELAY).until(EC.presence_of_element_located((By.XPATH, '//div[@data-index="0"]')))
+            print("Loaded projects overview page!")
+        except TimeoutException:
+            raise TimeoutException('Loading projects overview page took too much time')
+
+    def download_screen_history(self):
+        urls = ['https://app.zeplin.io/project/5c3da066182f8e339c8d00a9/screen/5c6d62110cb0f599dfd379c1',
+               'https://app.zeplin.io/project/5c3da066182f8e339c8d00a9/screen/5c6a8ca8dd0ba39a1b1843dd']
+
+        self.driver.implicitly_wait(self.DELAY)
+        for i, url in enumerate(urls):
+            self.driver.get(url)
+            try:
+                WebDriverWait(self.driver, self.DELAY * 3).until(
+                    EC.presence_of_element_located((By.CLASS_NAME, 'widgets')))
+                # Should also get the name of the screen
+                screen_name = self.screen_name()
+                screen_name = screen_name.replace(" ", "_")
+                print("Loaded %s" % screen_name)
+            except TimeoutException:
+                raise TimeoutException('Loading page took too much time')
+            self.step_new(screen_name=screen_name)
+            print('Completed URL: %d out of %d' % (i, len(urls)))
+
 
 if __name__ == "__main__":
-    zeplin_crawler = Crawler(config_file="C:\\Users\\CAP\\PycharmProjects\\Zeplin\\config.cfg")
+    #zeplin_crawler = Crawler(config_file="C:\\Users\\CAP\\PycharmProjects\\Zeplin\\config.cfg")
+    zeplin_crawler = Crawler(config_file="/home/casper/github/ZeplinCrawler/config.cfg")
     zeplin_crawler.login()
-    zeplin_crawler.projectoverview()
-    zeplin_crawler.get_screen_list()
+
+    #zeplin_crawler.projectoverview()
+    #zeplin_crawler.get_screen_list()
+    zeplin_crawler.download_screen_history()
 
 
 
