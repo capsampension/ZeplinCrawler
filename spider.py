@@ -5,6 +5,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
+from timeit import default_timer as timer
 import os
 import json
 
@@ -184,6 +185,7 @@ class Crawler(object):
         except TimeoutException:
             raise TimeoutException('Loading WebApp overview page took too much time')
 
+        start = timer()
         for i, url in enumerate(urls):
             group, url = url.split(';#;')
             self.driver.get(url)
@@ -199,8 +201,11 @@ class Crawler(object):
             self.step(screen_name=group+'_-_'+screen_name)
 
             if (i+1) % 25 == 0:
-                print('Completed URL! (%d out of %d)' % (i, len(urls)))
-
+                end = timer()
+                print('Completed %d out of %d urls in %1.3f seconds' % (i, len(urls), (end-start)))
+                start = timer()
+        end = timer()
+        print('Completed all urls (last elapsed time: %1.3f seconds)' % (end - start))
 
 def load_groups_from_disk(data_directory):
     """
