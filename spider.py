@@ -6,8 +6,10 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
 from timeit import default_timer as timer
+import numpy as np
 import os
 import json
+import datetime
 
 
 class Crawler(object):
@@ -51,8 +53,8 @@ class Crawler(object):
         # Now we must open the version sidebar
         screenviewcontainer = screencontent.find_element_by_class_name("screenViewContainer")
         screenview_widgets = screenviewcontainer.find_element_by_class_name("widgets")
-        toggle_version_button = screenview_widgets.find_element_by_xpath('//button[contains(@class, "versionsToggleWidget")]')
-        toggle_version_button.send_keys(Keys.RETURN)
+        toggle_button = screenview_widgets.find_element_by_xpath('//button[contains(@class, "versionsToggleWidget")]')
+        toggle_button.send_keys(Keys.RETURN)
 
         # Wait a "fixed" amount
         try:
@@ -167,7 +169,9 @@ class Crawler(object):
         password_field.send_keys(Keys.RETURN)
 
         try:
-            WebDriverWait(self.driver, self.DELAY).until(EC.presence_of_element_located((By.XPATH, '//div[@data-index="0"]')))
+            WebDriverWait(self.driver, self.DELAY).until(
+                EC.presence_of_element_located((By.XPATH, '//div[@data-index="0"]'))
+            )
             print("Loaded projects overview page!")
         except TimeoutException:
             raise TimeoutException('Loading projects overview page took too much time')
@@ -207,6 +211,10 @@ class Crawler(object):
         end = timer()
         print('Completed all urls (last elapsed time: %1.3f seconds)' % (end - start))
 
+    def close_driver(self):
+        self.driver.close()
+
+
 def load_groups_from_disk(data_directory):
     """
     Reads URLs from a collection of files.
@@ -224,6 +232,7 @@ def load_groups_from_disk(data_directory):
 
     print('Processed all groups. Total screens: %d' % len(result_list))
     return result_list
+
 
 def filter_url_list_by_screen(screens, screen):
     """
@@ -247,16 +256,105 @@ def filter_url_list_by_screen(screens, screen):
     print('Filtered list contains to %d URLs' % len(res))
     return res
 
-if __name__ == "__main__":
-    zeplin_crawler = Crawler(config_file="C:\\Users\\CAP\\PycharmProjects\\Zeplin\\config.cfg")
-    #zeplin_crawler = Crawler(config_file="/home/casper/github/ZeplinCrawler/config.cfg")
-    zeplin_crawler.login()
 
+def download_screen_urls():
+    zeplin_crawler = Crawler(config_file="C:\\Users\\CAP\\PycharmProjects\\Zeplin\\config.cfg")
+    zeplin_crawler.login()
     zeplin_crawler.projectoverview()
-    #zeplin_crawler.write_groups_and_screens_to_disk()
+    zeplin_crawler.write_groups_and_screens_to_disk()
+    zeplin_crawler.close_driver()
+
+
+def crawl_screen_versions():
+    zeplin_crawler = Crawler(config_file="C:\\Users\\CAP\\PycharmProjects\\Zeplin\\config.cfg")
+    zeplin_crawler.login()
+    zeplin_crawler.projectoverview()
     urls = load_groups_from_disk(data_directory=zeplin_crawler.DATA_DIRECTORY)
     urls = filter_url_list_by_screen(urls, screen='screen/5cab215a16f8996023e6b276')
     zeplin_crawler.download_screen_history(urls=urls)
+    zeplin_crawler.close_driver()
+
+
+def map_to_datetime(date_to_convert):
+    # date_to_convert is on the form: 'May 14, 2019'
+    date_to_convert = date_to_convert.replace(',', '')
+    components = date_to_convert.split(' ')
+    if len(components) < 3:
+        # Its probably 'Yesterday'
+        yesterday = str((datetime.datetime.now() - datetime.timedelta(days=1)).date())
+        return yesterday
+
+    try:
+        month, day, year = date_to_convert.split(' ')
+    except ValueError as e:
+        print(date_to_convert)
+        raise ValueError
+    if month == 'January':
+        month = '01'
+    elif month == 'February':
+        month = '02'
+    elif month == 'March':
+        month = '03'
+    elif month == 'April':
+        month = '04'
+    elif month == 'May':
+        month = '05'
+    elif month == 'June':
+        month = '06'
+    elif month == 'July':
+        month = '07'
+    elif month == 'August':
+        month = '08'
+    elif month == 'September':
+        month = '09'
+    elif month == 'October':
+        month = '10'
+    elif month == 'November':
+        month = '11'
+    else:
+        month = '12'
+
+    if len(day) == 1:
+        day = '0'+day
+
+    return year + '-' + month + '-' + day
+
+
+def screen_usage():
+    zeplin_crawler = Crawler(config_file="C:\\Users\\CAP\\PycharmProjects\\Zeplin\\config.cfg")
+    dir_content = os.listdir(zeplin_crawler.SCREEN_DIRECTORY)
+    print('Found %d files in %s' % (len(dir_content), zeplin_crawler.SCREEN_DIRECTORY))
+    res_dict = dict()
+    for file in dir_content:
+        group, filename = file.rsplit(sep="_-_", maxsplit=1)
+        abs_file_path = os.path.join(zeplin_crawler.SCREEN_DIRECTORY, file)
+        with open(abs_file_path, 'r', encoding='utf-8') as json_file:
+            screen_history = json.load(json_file)
+        # As the history is already ordered, the first element can be used. It is not so robust, but works for now
+        latest_edit_date = screen_history[0]
+        latest_edit_date = map_to_datetime(latest_edit_date)
+        dt_latest_edit_date = datetime.datetime.strptime(latest_edit_date, '%Y-%m-%d').date()
+        current_date = datetime.datetime.now().date()
+        date_diff = (current_date - dt_latest_edit_date).days
+        if group in res_dict.keys():
+            res_dict[group].append(date_diff)
+        else:
+            res_dict[group] = [date_diff]
+
+    for key in res_dict.keys():
+        max_edit_date = np.max(res_dict[key])
+        num_elem = len(res_dict[key])
+        min_edit_date = np.min(res_dict[key])
+        avg_edit_time = np.average(res_dict[key])
+        print('Group: %s' % key)
+        print('\tOldest edit time: %d days ago\n\tNumber of distinct days of editing: %d\n\tnewest edit time: %d days ago\n\taverage edit time: %1.2f days ago\n' % (max_edit_date, num_elem, min_edit_date, avg_edit_time))
+
+
+if __name__ == "__main__":
+    screen_usage()
+
+
+
 
 
 
