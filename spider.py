@@ -25,16 +25,16 @@ class Crawler(object):
             raise ValueError("%s is not a directory. Aborting...")
         self.driver = None
 
-    def next_screen(self):
-        header_title = self.driver.find_element_by_class_name("headerTitle")
-        button_right = header_title.find_element_by_id('arrowRight')
-        return button_right
-
     def screen_name(self):
         headertitle = self.driver.find_element_by_class_name("headerTitle")
         headercontainer = headertitle.find_element_by_class_name("headerContainer")
         header = headercontainer.find_element_by_id('header')
         return header.get_attribute('title')
+
+    def next_screen(self):
+        header_title = self.driver.find_element_by_class_name("headerTitle")
+        button_right = header_title.find_element_by_id('arrowRight')
+        return button_right
 
     def step(self, val=0):
         screen_name = str(val)
@@ -90,38 +90,6 @@ class Crawler(object):
             print('All screenContent should now be visible')
             self.step(val=val + 1)
 
-    def step_new(self, screen_name):
-        screencontent = self.driver.find_element_by_xpath('//div[@class="screenContent"]')
-        # Now we must open the version sidebar
-        screenviewcontainer = screencontent.find_element_by_class_name("screenViewContainer")
-        screenview_widgets = screenviewcontainer.find_element_by_class_name("widgets")
-        toggle_version_button = screenview_widgets.find_element_by_xpath('//button[contains(@class, "versionsToggleWidget")]')
-        toggle_version_button.send_keys(Keys.RETURN)
-
-        # Wait a "fixed" amount
-        try:
-            WebDriverWait(self.driver, self.DELAY).until(
-                EC.presence_of_element_located((By.CLASS_NAME, 'versionHeader')))
-            # Should also get the name of the screen
-        except TimeoutException:
-            raise TimeoutException('Loading page took too much time')
-
-        versions_sidebar = screencontent.find_element_by_class_name("versionsSidebar")
-        versions = versions_sidebar.find_element_by_class_name("versions")
-        version_elements = versions.find_elements_by_class_name("versionHeader")
-
-        self.driver.implicitly_wait(self.DELAY)
-        version_list = []
-        for elem in version_elements:
-            version_date = elem.find_element_by_class_name('versionHeaderText').text
-            version_list.append(version_date)
-            print('Found version_date %s' % version_date)
-
-        # Flush results to disk
-        with open(os.path.join(self.DATA_DIRECTORY, screen_name+".json"), 'w', encoding='utf-8') as writer:
-            writer.write(json.dumps(version_list))
-
-
     def get_first_screen(self):
         try:
             WebDriverWait(self.driver, self.DELAY).until(EC.presence_of_element_located((By.XPATH, '//div[@data-index="0"]')))
@@ -154,6 +122,37 @@ class Crawler(object):
         first_screen_link = first_screen_in_group.find_element_by_class_name('screenLink')
         first_screen_link.send_keys(Keys.RETURN)
         self.step()
+
+    def step_new(self, screen_name):
+        screencontent = self.driver.find_element_by_xpath('//div[@class="screenContent"]')
+        # Now we must open the version sidebar
+        screenviewcontainer = screencontent.find_element_by_class_name("screenViewContainer")
+        screenview_widgets = screenviewcontainer.find_element_by_class_name("widgets")
+        toggle_version_button = screenview_widgets.find_element_by_xpath('//button[contains(@class, "versionsToggleWidget")]')
+        toggle_version_button.send_keys(Keys.RETURN)
+
+        # Wait a "fixed" amount
+        try:
+            WebDriverWait(self.driver, self.DELAY).until(
+                EC.presence_of_element_located((By.CLASS_NAME, 'versionHeader')))
+            # Should also get the name of the screen
+        except TimeoutException:
+            raise TimeoutException('Loading page took too much time')
+
+        versions_sidebar = screencontent.find_element_by_class_name("versionsSidebar")
+        versions = versions_sidebar.find_element_by_class_name("versions")
+        version_elements = versions.find_elements_by_class_name("versionHeader")
+
+        self.driver.implicitly_wait(self.DELAY)
+        version_list = []
+        for elem in version_elements:
+            version_date = elem.find_element_by_class_name('versionHeaderText').text
+            version_list.append(version_date)
+            print('Found version_date %s' % version_date)
+
+        # Flush results to disk
+        with open(os.path.join(self.DATA_DIRECTORY, screen_name+".json"), 'w', encoding='utf-8') as writer:
+            writer.write(json.dumps(version_list))
 
     def get_screen_list(self):
         try:
