@@ -347,7 +347,7 @@ def screen_usage():
         min_edit_date = np.min(res_dict[key])
         avg_edit_time = np.average(res_dict[key])
         print('Group: %s' % key)
-        print('\tOldest edit time: %d days ago\n\tNumber of distinct days of editing: %d\n\tnewest edit time: %d days ago\n\taverage edit time: %1.2f days ago\n' % (max_edit_date, num_elem, min_edit_date, avg_edit_time))
+        print('\tOldest edit time: %d days ago\n\tNumber of screens under headline: %d\n\tnewest edit time: %d days ago\n\taverage edit time: %1.2f days ago\n' % (max_edit_date, num_elem, min_edit_date, avg_edit_time))
 
 
 if __name__ == "__main__":
