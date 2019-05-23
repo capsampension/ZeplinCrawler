@@ -344,6 +344,7 @@ def screen_usage():
     for key in res_dict.keys():
         max_edit_date = np.max(res_dict[key])
         num_elem = len(res_dict[key])
+        num_screens_edited_last_week = sum(res_dict[key] <= 7)
         min_edit_date = np.min(res_dict[key])
         avg_edit_time = np.average(res_dict[key])
         print('Group: %s' % key)
